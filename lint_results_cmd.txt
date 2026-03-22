@@ -1,0 +1,37 @@
+
+C:\Users\Kyrellos\Desktop\New folder (3)\src\components\OhmsLaw.jsx
+  12:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  10 |         // I = V / R
+  11 |         const calculatedCurrent = voltage / resistance;
+> 12 |         setCurrent(calculatedCurrent);
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  13 |     }, [voltage, resistance]);
+  14 |
+  15 |     // Format current for display (mA if < 1A)  react-hooks/set-state-in-effect
+
+C:\Users\Kyrellos\Desktop\New folder (3)\src\components\WheatstoneBridge.jsx
+  25:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  23 |         // Potential difference
+  24 |         const diff = v1 - v2;
+> 25 |         setGalvanometer(diff);
+     |         ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  26 |     }, [r1, r2, r3, rx, voltage]);
+  27 |
+  28 |     // Calculate needle rotation based on voltage difference max ~ +/- 12V -> +/- 45 deg  react-hooks/set-state-in-effect
+
+✖ 2 problems (2 errors, 0 warnings)
+
