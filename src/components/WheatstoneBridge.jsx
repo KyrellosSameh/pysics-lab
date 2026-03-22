@@ -89,7 +89,7 @@ export default function WheatstoneBridge() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginTop: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '24px', marginTop: '16px' }}>
 
                 {/* Left Side: Circuit and Meter Bridge */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import OhmsLaw from './components/OhmsLaw';
 import WheatstoneBridge from './components/WheatstoneBridge';
@@ -11,8 +11,16 @@ import { Beaker, Settings, Atom, TestTube, Scale, Activity, LogOut } from 'lucid
 
 // Pages: 'landing' | 'login' | 'session' | 'lab'
 function App() {
-  const [page, setPage] = useState('landing');
-  const [activeTab, setActiveTab] = useState('ohm');
+  const [page, setPage] = useState(() => localStorage.getItem('app_page') || 'landing');
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('app_activeTab') || 'ohm');
+
+  useEffect(() => {
+    localStorage.setItem('app_page', page);
+  }, [page]);
+
+  useEffect(() => {
+    localStorage.setItem('app_activeTab', activeTab);
+  }, [activeTab]);
 
   const navItems = [
     { id: 'ohm', label: "Ohm's Law", icon: <Activity size={20} /> },
