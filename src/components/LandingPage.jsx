@@ -3,10 +3,7 @@ import { PlusCircle, PlayCircle, Zap, FlaskConical, Microscope } from 'lucide-re
 function LandingPage({ onCreateQuiz, onTakeQuiz, onEnterLab }) {
   return (
     <div className="landing-page">
-      {/* Animated background blobs */}
-      <div className="blob blob-1" />
-      <div className="blob blob-2" />
-      <div className="blob blob-3" />
+      {/* High-Tech grid applied via index.css body background */}
 
       <div className="landing-content">
         {/* Logo / Title */}

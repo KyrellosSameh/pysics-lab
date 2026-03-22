@@ -1,18 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --bg-dark: #0f172a;
-  --bg-panel: rgba(30, 41, 59, 0.7);
+  --primary: #06b6d4;      /* Cyan */
+  --primary-hover: #0891b2;
+  --bg-dark: #080b12;      /* Deep Hardware Charcoal */
+  --bg-panel: rgba(15, 23, 42, 0.85);
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --accent: #10b981;
+  --accent: #10b981;       /* Emerald */
   --danger: #ef4444;
   --border-color: rgba(255, 255, 255, 0.1);
-  --glass-bg: rgba(15, 23, 42, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glow-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+  --glass-bg: rgba(11, 16, 29, 0.75);
+  --glass-border: rgba(6, 182, 212, 0.15); /* Cyan-tinted borders */
+  --glow-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+  --grid-color: rgba(6, 182, 212, 0.04);
   
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -35,7 +36,12 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+  background-color: var(--bg-dark);
+  background-image: 
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center center;
   background-attachment: fixed;
   overflow-x: hidden;
 }
@@ -72,14 +78,14 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-/* Glassmorphism Panel styles */
+/* Instrument Hardware Panel styles */
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3), var(--glow-shadow);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Base App Layout */
@@ -143,19 +149,29 @@ button:focus-visible {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
-/* Device simulation realistic styles */
+/* High-Tech Realistic LCD Display Styles */
 .device-display {
   font-family: 'Courier New', Courier, monospace;
-  background: #db4b4b; /* Default LCD red color */
-  color: #111;
-  text-shadow: 0 0 2px rgba(0,0,0,0.2);
-  padding: 0.5rem;
-  border-radius: 4px;
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+  background: #111;
+  color: #ef4444; /* Neon Red */
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  padding: 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #000;
+  box-shadow: inset 0 4px 10px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.1);
   font-weight: bold;
+  position: relative;
+  overflow: hidden;
+}
+.device-display::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(rgba(255,255,255,0.03) 50%, rgba(0,0,0,0.03) 50%);
+  background-size: 100% 4px; pointer-events: none;
 }
 .device-display.green {
-  background: #a3d9a5;
+  color: #10b981; /* Neon Green */
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  background: #0f1712;
 }
 
 /* Responsive Styles */
@@ -217,39 +233,7 @@ button:focus-visible {
   padding: 2rem;
 }
 
-/* Animated background blobs */
-.blob {
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.18;
-  pointer-events: none;
-  animation: blobPulse 8s ease-in-out infinite;
-}
-.blob-1 {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, #3b82f6, #6366f1);
-  top: -150px; left: -200px;
-  animation-delay: 0s;
-}
-.blob-2 {
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, #10b981, #06b6d4);
-  bottom: -100px; right: -100px;
-  animation-delay: 3s;
-}
-.blob-3 {
-  width: 350px; height: 350px;
-  background: radial-gradient(circle, #8b5cf6, #ec4899);
-  top: 50%; left: 55%;
-  animation-delay: 5s;
-}
-
-@keyframes blobPulse {
-  0%, 100% { transform: scale(1) translate(0, 0); }
-  33%  { transform: scale(1.08) translate(20px, -15px); }
-  66%  { transform: scale(0.94) translate(-15px, 10px); }
-}
+/* High-Tech Grid handles background aesthetics */
 
 .landing-content {
   position: relative;
