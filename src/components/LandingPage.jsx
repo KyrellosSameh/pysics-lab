@@ -1,6 +1,10 @@
-import { PlusCircle, PlayCircle, Zap, FlaskConical, Microscope } from 'lucide-react';
+import { GraduationCap, BookOpen, Zap, FlaskConical, Microscope } from 'lucide-react';
 
-function LandingPage({ onCreateQuiz, onTakeQuiz, onEnterLab }) {
+function LandingPage() {
+  const navigate = (path) => {
+    window.location.hash = path;
+  };
+
   return (
     <div className="landing-page">
       {/* High-Tech grid applied via index.css body background */}
@@ -30,47 +34,50 @@ function LandingPage({ onCreateQuiz, onTakeQuiz, onEnterLab }) {
 
         {/* Action Buttons */}
         <div className="landing-actions">
+          
+          {/* Instructor Button */}
           <button
             className="landing-btn landing-btn--primary"
-            onClick={onCreateQuiz}
-            id="create-quiz-btn"
+            onClick={() => navigate('/lab/instructor')}
+            id="instructor-btn"
           >
             <div className="btn-icon-wrapper btn-icon--primary">
-              <PlusCircle size={28} strokeWidth={1.8} />
+              <GraduationCap size={28} strokeWidth={1.8} />
             </div>
             <div className="btn-text">
-              <span className="btn-title">إنشاء اختبار</span>
-              <span className="btn-subtitle">Create a new quiz session</span>
+              <span className="btn-title">معيد / دكتور</span>
+              <span className="btn-subtitle">Instructor / Doctor Login</span>
             </div>
             <Zap size={16} className="btn-arrow" />
           </button>
 
+          {/* Student Button */}
           <button
             className="landing-btn landing-btn--secondary"
-            onClick={onTakeQuiz}
-            id="take-quiz-btn"
+            onClick={() => navigate('/lab/student')}
+            id="student-btn"
           >
             <div className="btn-icon-wrapper btn-icon--secondary">
-              <PlayCircle size={28} strokeWidth={1.8} />
+              <BookOpen size={28} strokeWidth={1.8} />
             </div>
             <div className="btn-text">
-              <span className="btn-title">أداء اختبار</span>
-              <span className="btn-subtitle">Join with session code</span>
+              <span className="btn-title">طالب</span>
+              <span className="btn-subtitle">Student Exam Entry</span>
             </div>
             <Zap size={16} className="btn-arrow" />
           </button>
 
-          {/* Enter Lab directly */}
+          {/* Browse Lab directly */}
           <button
             className="landing-btn landing-btn--lab"
-            onClick={onEnterLab}
-            id="enter-lab-btn"
+            onClick={() => navigate('/lab/browse')}
+            id="browse-lab-btn"
           >
             <div className="btn-icon-wrapper btn-icon--lab">
               <Microscope size={28} strokeWidth={1.8} />
             </div>
             <div className="btn-text">
-              <span className="btn-title">الدخول للتجارب</span>
+              <span className="btn-title">تصفح التجارب</span>
               <span className="btn-subtitle">Browse all experiments</span>
             </div>
             <Zap size={16} className="btn-arrow" />
@@ -78,7 +85,7 @@ function LandingPage({ onCreateQuiz, onTakeQuiz, onEnterLab }) {
         </div>
 
         {/* Stats Row */}
-        <div className="landing-stats">
+        <div className="landing-stats" style={{ marginBottom: '40px' }}>
           <div className="stat-item">
             <span className="stat-number">4</span>
             <span className="stat-label">Experiments</span>

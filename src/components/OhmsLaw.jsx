@@ -4,7 +4,7 @@ import { Zap, Activity, Battery, TriangleRight, CheckCircle2, XCircle, RefreshCw
 // Standard E12 series resistor values suitable for lab experiments (Ohms)
 const STANDARD_RESISTORS = [10, 22, 33, 47, 56, 68, 100, 150, 220, 330, 470, 560, 680, 1000];
 
-export default function OhmsLaw() {
+export default function OhmsLaw({ examConfig, onSubmitResult }) {
     const [voltage, setVoltage] = useState(12); // Volts
     const [resistance, setResistance] = useState(100); // True Resistance in Ohms
     
@@ -17,10 +17,14 @@ export default function OhmsLaw() {
     const [voltageNoise, setVoltageNoise] = useState(1);
     const [currentNoise, setCurrentNoise] = useState(1);
 
-    // Function to generate a new random problem
+    // Function to generate a new random problem or load exam
     const generateNewResistor = useCallback(() => {
-        const randomResistor = STANDARD_RESISTORS[Math.floor(Math.random() * STANDARD_RESISTORS.length)];
-        setResistance(randomResistor);
+        if (examConfig) {
+            setResistance(examConfig.parameters.ohmResistance);
+        } else {
+            const randomResistor = STANDARD_RESISTORS[Math.floor(Math.random() * STANDARD_RESISTORS.length)];
+            setResistance(randomResistor);
+        }
         
         // Reset evaluation
         setStudentAnswer('');
@@ -35,7 +39,13 @@ export default function OhmsLaw() {
     // Initialize on mount
     useEffect(() => {
         generateNewResistor();
-    }, [generateNewResistor]);
+    }, [generateNewResistor, examConfig?.code]); // Add code to dep so it doesn't re-run on examComplete change
+
+    useEffect(() => {
+        if (examConfig?.examComplete) {
+            setIsEvaluated(true);
+        }
+    }, [examConfig?.examComplete]);
 
     const theoreticalCurrent = voltage / resistance;
 
@@ -63,6 +73,10 @@ export default function OhmsLaw() {
 
         setIsCorrect(isAnswerCorrect);
         setIsEvaluated(true);
+        
+        if (examConfig && onSubmitResult) {
+            onSubmitResult(parsedAnswer, resistance);
+        }
     };
 
     // Format current for display (mA if < 1A)
@@ -174,10 +188,10 @@ export default function OhmsLaw() {
                             </div>
                             <div style={{ width: '40px', height: '4px', background: '#94a3b8' }}></div>
                         </div>
-                        <div style={{ fontSize: '2rem', fontWeight: 700, color: isEvaluated ? (isCorrect ? '#10b981' : '#ef4444') : '#f59e0b', marginTop: '16px' }}>
-                            {isEvaluated ? `${resistance} Ω` : '? Ω'}
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: isEvaluated ? (examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444')) : '#f59e0b', marginTop: '16px' }}>
+                            {isEvaluated ? (examConfig ? '*** Ω' : `${resistance} Ω`) : '? Ω'}
                         </div>
-                        {isEvaluated && (
+                        {isEvaluated && !examConfig && (
                             <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '8px' }}>
                                 True Value
                             </div>
@@ -209,7 +223,7 @@ export default function OhmsLaw() {
                                         fontSize: '1rem',
                                         outline: 'none',
                                         transition: 'all 0.2s',
-                                        borderColor: isEvaluated ? (isCorrect ? '#10b981' : '#ef4444') : 'var(--glass-border)'
+                                        borderColor: isEvaluated ? (examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444')) : 'var(--glass-border)'
                                     }}
                                 />
                                 <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>Ω</span>
@@ -233,22 +247,24 @@ export default function OhmsLaw() {
                                     Check
                                 </button>
                             ) : (
-                                <button
-                                    type="button"
-                                    onClick={generateNewResistor}
-                                    style={{
-                                        background: 'transparent',
-                                        border: '1px solid var(--primary)',
-                                        color: 'var(--primary)',
-                                        borderRadius: '8px',
-                                        padding: '0 16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}
-                                >
-                                    <RefreshCw size={18} /> Retry
-                                </button>
+                                !examConfig && (
+                                    <button
+                                        type="button"
+                                        onClick={generateNewResistor}
+                                        style={{
+                                            background: 'transparent',
+                                            border: '1px solid var(--primary)',
+                                            color: 'var(--primary)',
+                                            borderRadius: '8px',
+                                            padding: '0 16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <RefreshCw size={18} /> Retry
+                                    </button>
+                                )
                             )}
                         </form>
 
@@ -261,15 +277,15 @@ export default function OhmsLaw() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
-                                background: isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                border: `1px solid ${isCorrect ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                                background: examConfig ? 'rgba(59, 130, 246, 0.1)' : (isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'),
+                                border: `1px solid ${examConfig ? 'rgba(59, 130, 246, 0.3)' : (isCorrect ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)')}`
                             }}>
-                                {isCorrect ? <CheckCircle2 size={24} color="#10b981" /> : <XCircle size={24} color="#ef4444" />}
+                                {examConfig ? <CheckCircle2 size={24} color="#3b82f6" /> : (isCorrect ? <CheckCircle2 size={24} color="#10b981" /> : <XCircle size={24} color="#ef4444" />)}
                                 <div>
-                                    <div style={{ fontWeight: 600, color: isCorrect ? '#10b981' : '#ef4444' }}>
-                                        {isCorrect ? 'Correct! Excellent job.' : 'Incorrect.'}
+                                    <div style={{ fontWeight: 600, color: examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444') }}>
+                                        {examConfig ? 'شكراً لك، لقت تم تسجيل إجابتك بنجاح' : (isCorrect ? 'Correct! Excellent job.' : 'Incorrect.')}
                                     </div>
-                                    {!isCorrect && (
+                                    {(!examConfig && !isCorrect) && (
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                                             Remember to convert current to Amperes before calculating! (1000 mA = 1 A)
                                         </div>

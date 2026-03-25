@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Scale, ArrowDown, RefreshCw, TriangleRight, CheckCircle2, XCircle } from 'lucide-react';
 
-export default function HookesLaw() {
+export default function HookesLaw({ examConfig, onSubmitResult }) {
     const [attachedMasses, setAttachedMasses] = useState([]); // array of { id, grams }
     const [dragOverHook, setDragOverHook] = useState(false);
 
@@ -13,9 +13,13 @@ export default function HookesLaw() {
     const [isCorrect, setIsCorrect] = useState(null);
 
     const generateNewSpring = useCallback(() => {
-        // Values typically between 10 and 50 
-        const newK = Math.floor(Math.random() * 41) + 10;
-        setSpringConstant(newK);
+        if (examConfig) {
+            setSpringConstant(examConfig.parameters.hookeSpringConstant);
+        } else {
+            // Values typically between 10 and 50 
+            const newK = Math.floor(Math.random() * 41) + 10;
+            setSpringConstant(newK);
+        }
         setNoiseMultiplier(1 + (Math.random() * 0.06 - 0.03)); // +/- 3% error
 
         // Reset
@@ -28,7 +32,13 @@ export default function HookesLaw() {
     // Initialize on mount
     useEffect(() => {
         generateNewSpring();
-    }, [generateNewSpring]);
+    }, [generateNewSpring, examConfig?.code]);
+
+    useEffect(() => {
+        if (examConfig?.examComplete) {
+            setIsEvaluated(true);
+        }
+    }, [examConfig?.examComplete]);
 
     // Available mass types in the lab tray
     const MASS_TYPES = [
@@ -127,6 +137,10 @@ export default function HookesLaw() {
 
         setIsCorrect(isMatchCalc || isMatchReal);
         setIsEvaluated(true);
+        
+        if (examConfig && onSubmitResult) {
+            onSubmitResult(parsedAnswer, springConstant);
+        }
     };
 
     return (
@@ -297,10 +311,10 @@ export default function HookesLaw() {
                         </div>
 
                         <div style={{ padding: '24px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', marginBottom: '24px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 700, color: isEvaluated ? (isCorrect ? '#10b981' : '#ef4444') : '#f59e0b' }}>
-                                {isEvaluated ? `${springConstant} N/m` : '? N/m'}
+                            <div style={{ fontSize: '2.5rem', fontWeight: 700, color: isEvaluated ? (examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444')) : '#f59e0b' }}>
+                                {isEvaluated ? (examConfig ? '*** N/m' : `${springConstant} N/m`) : '? N/m'}
                             </div>
-                            {isEvaluated && (
+                            {isEvaluated && !examConfig && (
                                 <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '8px' }}>
                                     Target Value
                                 </div>
@@ -321,7 +335,7 @@ export default function HookesLaw() {
                                         style={{
                                             width: '100%', padding: '12px 16px', paddingRight: '46px', background: 'rgba(0,0,0,0.2)',
                                             border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#fff', fontSize: '1rem',
-                                            outline: 'none', transition: 'all 0.2s', borderColor: isEvaluated ? (isCorrect ? '#10b981' : '#ef4444') : 'var(--glass-border)',
+                                            outline: 'none', transition: 'all 0.2s', borderColor: isEvaluated ? (examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444')) : 'var(--glass-border)',
                                             opacity: (mass === 0 && !isEvaluated) ? 0.5 : 1
                                         }}
                                     />
@@ -334,21 +348,23 @@ export default function HookesLaw() {
                                         style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0 16px', fontWeight: 600, cursor: (studentAnswer.trim() && mass > 0) ? 'pointer' : 'not-allowed', opacity: (studentAnswer.trim() && mass > 0) ? 1 : 0.6 }}
                                     > Check </button>
                                 ) : (
-                                    <button
-                                        type="button" onClick={generateNewSpring}
-                                        style={{ background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)', borderRadius: '8px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                    > <RefreshCw size={16} /> Retry </button>
+                                    !examConfig && (
+                                        <button
+                                            type="button" onClick={generateNewSpring}
+                                            style={{ background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)', borderRadius: '8px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                        > <RefreshCw size={16} /> Retry </button>
+                                    )
                                 )}
                             </form>
 
                             {isEvaluated && (
-                                <div style={{ marginTop: '16px', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', background: isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', border: `1px solid ${isCorrect ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
-                                    {isCorrect ? <CheckCircle2 size={24} color="#10b981" style={{ flexShrink: 0 }} /> : <XCircle size={24} color="#ef4444" style={{ flexShrink: 0 }} />}
+                                <div style={{ marginTop: '16px', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', background: examConfig ? 'rgba(59, 130, 246, 0.1)' : (isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'), border: `1px solid ${examConfig ? 'rgba(59, 130, 246, 0.3)' : (isCorrect ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)')}` }}>
+                                    {examConfig ? <CheckCircle2 size={24} color="#3b82f6" style={{ flexShrink: 0 }} /> : (isCorrect ? <CheckCircle2 size={24} color="#10b981" style={{ flexShrink: 0 }} /> : <XCircle size={24} color="#ef4444" style={{ flexShrink: 0 }} />)}
                                     <div>
-                                        <div style={{ fontWeight: 600, color: isCorrect ? '#10b981' : '#ef4444' }}>
-                                            {isCorrect ? 'Correct! Excellent job.' : 'Incorrect.'}
+                                        <div style={{ fontWeight: 600, color: examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444') }}>
+                                            {examConfig ? 'شكراً لك، لقت تم تسجيل إجابتك بنجاح' : (isCorrect ? 'Correct! Excellent job.' : 'Incorrect.')}
                                         </div>
-                                        {!isCorrect && (
+                                        {(!examConfig && !isCorrect) && (
                                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                                                 Make sure your distance (x) is in meters, and you calculate k = F / x.
                                             </div>

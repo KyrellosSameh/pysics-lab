@@ -1,12 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, TestTube, CheckCircle2, XCircle, Ruler, Crosshair } from 'lucide-react';
 
-export default function Viscosity() {
+export default function Viscosity({ examConfig, onSubmitResult }) {
     const g = 9.8; 
     const ballDensity = 7800; // Steel
     const distanceMeters = 0.6; 
     
     const [fluidProps] = useState(() => {
+        if (examConfig && examConfig.parameters.viscosityLiquid) {
+            const name = examConfig.parameters.viscosityLiquid;
+            let density = 1260;
+            let viscosity = 0.95;
+            let color = '#d97706';
+            let colorLight = 'rgba(217, 119, 6, 0.4)';
+            
+            if (name === 'Glycerin') { density = 1260; viscosity = 1.41; color='#0ea5e9'; colorLight='rgba(14, 165, 233, 0.4)'; }
+            else if (name === 'Castor Oil') { density = 960; viscosity = 0.98; color='#eab308'; colorLight='rgba(234, 179, 8, 0.4)'; }
+            else if (name === 'Motor Oil') { density = 880; viscosity = 0.65; color='#b45309'; colorLight='rgba(180, 83, 9, 0.4)'; }
+            
+            return { name, density, viscosity, color, colorLight };
+        }
+
         const trueViscosity = parseFloat((Math.random() * 0.7 + 0.8).toFixed(3));
         return {
             name: 'Mystery Fluid',
@@ -19,6 +33,24 @@ export default function Viscosity() {
 
     const [balls, setBalls] = useState(() => {
         const arr = [];
+        if (examConfig && examConfig.parameters.viscosityBalls) {
+            examConfig.parameters.viscosityBalls.forEach((d, i) => {
+                arr.push({
+                    id: i + 1,
+                    dTrue: d,
+                    radiusMeters: (d / 2) / 1000,
+                    tMeasured: null,
+                    inputD: '',
+                    inputV: '',
+                    inputEta: '',
+                    dCorrect: null,
+                    vCorrect: null,
+                    etaCorrect: null
+                });
+            });
+            return arr.sort((a,b) => a.dTrue - b.dTrue).map((b, i) => ({...b, id: i+1}));
+        }
+
         while (arr.length < 5) {
             const d = parseFloat((Math.random() * 15 + 5).toFixed(1)); 
             const distinct = arr.every(b => Math.abs(b.dTrue - d) >= 1.5);
@@ -174,8 +206,14 @@ export default function Viscosity() {
              allCorrect = false;
         }
 
-        if (allCorrect) {
+        if (examConfig) {
+             alert("تم تسجيل جميع القراءات بنجاح");
+        } else if (allCorrect) {
              alert("Excellent! All your measurements and calculations are correct.");
+        }
+        
+        if (examConfig && onSubmitResult) {
+            onSubmitResult(avgInputNum, avgExpected);
         }
     };
 
@@ -462,8 +500,8 @@ export default function Viscosity() {
                                             onChange={(e) => handleInputChange(b.id, 'inputD', e.target.value)}
                                             style={{ width: '80px', padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
                                         />
-                                        {b.dCorrect === true && <CheckCircle2 size={18} color="#10b981" />}
-                                        {b.dCorrect === false && <XCircle size={18} color="#ef4444" />}
+                                        {!examConfig && b.dCorrect === true && <CheckCircle2 size={18} color="#10b981" />}
+                                        {!examConfig && b.dCorrect === false && <XCircle size={18} color="#ef4444" />}
                                     </div>
                                 </td>
                                 <td style={{ padding: '12px' }}>
@@ -475,8 +513,8 @@ export default function Viscosity() {
                                             style={{ width: '80px', padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
                                             placeholder="e.g. 0.05"
                                         />
-                                        {b.vCorrect === true && <CheckCircle2 size={18} color="#10b981" />}
-                                        {b.vCorrect === false && <XCircle size={18} color="#ef4444" />}
+                                        {!examConfig && b.vCorrect === true && <CheckCircle2 size={18} color="#10b981" />}
+                                        {!examConfig && b.vCorrect === false && <XCircle size={18} color="#ef4444" />}
                                     </div>
                                 </td>
                                 <td style={{ padding: '12px' }}>
@@ -487,8 +525,8 @@ export default function Viscosity() {
                                             onChange={(e) => handleInputChange(b.id, 'inputEta', e.target.value)}
                                             style={{ width: '80px', padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
                                         />
-                                        {b.etaCorrect === true && <CheckCircle2 size={18} color="#10b981" />}
-                                        {b.etaCorrect === false && <XCircle size={18} color="#ef4444" />}
+                                        {!examConfig && b.etaCorrect === true && <CheckCircle2 size={18} color="#10b981" />}
+                                        {!examConfig && b.etaCorrect === false && <XCircle size={18} color="#ef4444" />}
                                     </div>
                                 </td>
                             </tr>
@@ -507,16 +545,25 @@ export default function Viscosity() {
                                 style={{ width: '100px', padding: '8px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--primary)', color: 'white', borderRadius: '6px', fontSize: '1.1rem' }}
                             />
                             <span style={{ color: 'var(--text-muted)' }}>Pa·s</span>
-                            {avgEtaCorrect === true && <CheckCircle2 size={24} color="#10b981" style={{ marginLeft: '8px' }} />}
-                            {avgEtaCorrect === false && <XCircle size={24} color="#ef4444" style={{ marginLeft: '8px' }} />}
+                            {!examConfig && avgEtaCorrect === true && <CheckCircle2 size={24} color="#10b981" style={{ marginLeft: '8px' }} />}
+                            {!examConfig && avgEtaCorrect === false && <XCircle size={24} color="#ef4444" style={{ marginLeft: '8px' }} />}
                         </div>
                     </div>
 
                     <button 
                         onClick={checkAnswers}
-                        style={{ padding: '12px 24px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        disabled={examConfig?.examComplete}
+                        style={{ 
+                            padding: '12px 24px', 
+                            background: 'var(--primary)', 
+                            color: 'white', border: 'none', borderRadius: '8px', 
+                            fontSize: '1.1rem', 
+                            cursor: examConfig?.examComplete ? 'not-allowed' : 'pointer', 
+                            fontWeight: 'bold',
+                            opacity: examConfig?.examComplete ? 0.5 : 1
+                        }}
                     >
-                        Check Answers
+                        {examConfig?.examComplete ? 'تم التسجيل' : 'Check Answers'}
                     </button>
                 </div>
 

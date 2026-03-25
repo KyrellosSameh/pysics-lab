@@ -7,20 +7,113 @@ import Viscosity from './components/Viscosity';
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import SessionCodePage from './components/SessionCodePage';
+import CreateExamPage from './components/CreateExamPage';
+import InstructorDashboard from './components/InstructorDashboard';
+import StudentResultsPage from './components/StudentResultsPage';
 import { Beaker, Settings, Atom, TestTube, Scale, Activity, LogOut } from 'lucide-react';
 
-// Pages: 'landing' | 'login' | 'session' | 'lab'
 function App() {
-  const [page, setPage] = useState(() => localStorage.getItem('app_page') || 'landing');
+  const [currentPath, setCurrentPath] = useState(() => window.location.hash.replace('#', '') || '/');
+  
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('app_activeTab') || 'ohm');
+  const [instructorName, setInstructorName] = useState(() => localStorage.getItem('app_instructorName') || '');
+  const [examConfig, setExamConfig] = useState(() => {
+    const saved = localStorage.getItem('app_examConfig');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [showWarning, setShowWarning] = useState(false);
+
+  // Hash Routing Listener
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') || '/';
+      setCurrentPath(hash);
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    // Sync on mount
+    handleHashChange();
+    
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const navigate = (path) => {
+    window.location.hash = path;
+  };
 
   useEffect(() => {
-    localStorage.setItem('app_page', page);
-  }, [page]);
+    localStorage.setItem('app_instructorName', instructorName);
+  }, [instructorName]);
+
+  useEffect(() => {
+    if (examConfig) {
+      localStorage.setItem('app_examConfig', JSON.stringify(examConfig));
+    } else {
+      localStorage.removeItem('app_examConfig');
+    }
+  }, [examConfig]);
 
   useEffect(() => {
     localStorage.setItem('app_activeTab', activeTab);
   }, [activeTab]);
+
+  // Global Timer Logic
+  useEffect(() => {
+    let timer;
+    if (examConfig && examConfig.startTime && !examConfig.examComplete) {
+      timer = setInterval(() => {
+        const elapsed = Date.now() - examConfig.startTime;
+        const remaining = Math.max(0, 30 * 60 * 1000 - elapsed);
+        setTimeLeft(remaining);
+        
+        if (remaining <= 5 * 60 * 1000 && remaining > 0) {
+          setShowWarning(true);
+        } else {
+          setShowWarning(false);
+        }
+        
+        if (remaining === 0) {
+          handleExamSubmit('--', 'N/A');
+        }
+      }, 1000);
+    } else {
+      setTimeLeft(null);
+      setShowWarning(false);
+    }
+    return () => clearInterval(timer);
+  }, [examConfig]);
+
+  const handleExamSubmit = (studentValue, actualValue) => {
+    if (!examConfig || examConfig.examComplete) return;
+    
+    // Save to global results
+    const newResults = JSON.parse(localStorage.getItem('physics_results') || '[]');
+    newResults.push({
+      studentName: examConfig.studentName,
+      studentId: examConfig.studentId,
+      examCode: examConfig.code || 'N/A',
+      experiment: examConfig.experiment,
+      studentResult: studentValue,
+      actualResult: actualValue,
+      unit: examConfig.experiment === 'ohm' ? 'Ω' :
+            examConfig.experiment === 'wheatstone' ? 'Ω' :
+            examConfig.experiment === 'hooke' ? 'N/m' : 'Pa·s',
+      instructorGrade: ''
+    });
+    localStorage.setItem('physics_results', JSON.stringify(newResults));
+    
+    // Lock exam
+    const updatedConfig = { ...examConfig, examComplete: true };
+    setExamConfig(updatedConfig);
+    
+    if (studentValue === '--') {
+         alert("انتهى وقت الاختبار. تم إرسال إجابتك تلقائياً.");
+    } else {
+         alert("تم إرسال إجابتك وإنهاء الاختبار بنجاح.");
+    }
+  };
 
   const navItems = [
     { id: 'ohm', label: "Ohm's Law", icon: <Activity size={20} /> },
@@ -29,106 +122,180 @@ function App() {
     { id: 'viscosity', label: 'Viscosity', icon: <TestTube size={20} /> },
   ];
 
-  // ── Page: Landing ──────────────────────────────────────────────
-  if (page === 'landing') {
+  // ── Pages Routing ──────────────────────────────────────────────
+  if (currentPath === '/') {
+    return <LandingPage />;
+  }
+
+  // Unified Instructor Entry Route
+  if (currentPath === '/lab/instructor') {
+    // If not logged in, show login page
+    if (!instructorName) {
+      return (
+        <LoginPage
+          onBack={() => navigate('/')}
+          onLogin={(data) => {
+            setInstructorName(data.username);
+            navigate('/lab/instructor/dashboard');
+          }}
+        />
+      );
+    } else {
+      // If logged in but visited `/lab/instructor`, auto-redirect to dashboard
+      window.location.hash = '/lab/instructor/dashboard';
+      return null;
+    }
+  }
+
+  if (currentPath === '/lab/instructor/dashboard') {
     return (
-      <LandingPage
-        onCreateQuiz={() => setPage('login')}
-        onTakeQuiz={() => setPage('session')}
-        onEnterLab={() => setPage('lab')}
+      <InstructorDashboard 
+        username={instructorName}
+        onBack={() => { setInstructorName(''); navigate('/'); }}
+        onCreateExam={() => navigate('/lab/instructor/create')}
+        onViewResults={() => navigate('/lab/instructor/results')}
       />
     );
   }
 
-  // ── Page: Login ────────────────────────────────────────────────
-  if (page === 'login') {
+  if (currentPath === '/lab/instructor/create') {
     return (
-      <LoginPage
-        onBack={() => setPage('landing')}
-        onLogin={() => setPage('lab')}
+      <CreateExamPage
+        onBack={() => navigate('/lab/instructor/dashboard')}
       />
     );
   }
 
-  // ── Page: Session Code ─────────────────────────────────────────
-  if (page === 'session') {
+  if (currentPath === '/lab/instructor/results') {
+    return (
+      <StudentResultsPage 
+        onBack={() => navigate('/lab/instructor/dashboard')}
+      />
+    );
+  }
+
+  if (currentPath === '/lab/student') {
     return (
       <SessionCodePage
-        onBack={() => setPage('landing')}
-        onJoin={() => setPage('lab')}
+        onBack={() => navigate('/')}
+        onJoin={(config) => {
+          setExamConfig(config);
+          setActiveTab(config.experiment); // Force the tab
+          navigate('/lab/exam');
+        }}
       />
     );
   }
 
   // ── Page: Lab ──────────────────────────────────────────────────
-  return (
-    <div className="app-container">
-      {/* Sidebar Navigation */}
-      <aside className="sidebar">
-        <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
-          <div style={{ padding: '8px', background: 'var(--primary)', borderRadius: '8px', color: 'white' }}>
-            <Beaker size={24} />
+  // Both '/lab/browse' and '/lab/exam' share the same lab UI
+  if (currentPath === '/lab/browse' || currentPath === '/lab/exam') {
+    return (
+      <div className="app-container">
+        {/* Sidebar Navigation */}
+        <aside className="sidebar">
+          <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
+            <div style={{ padding: '8px', background: 'var(--primary)', borderRadius: '8px', color: 'white' }}>
+              <Beaker size={24} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '1.2rem', lineHeight: '1.2' }}>Physics Lab</h1>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Virtual Simulator</span>
+            </div>
           </div>
-          <div>
-            <h1 style={{ fontSize: '1.2rem', lineHeight: '1.2' }}>Physics Lab</h1>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Virtual Simulator</span>
-          </div>
-        </div>
 
-        <nav className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {navItems.map(item => (
+          <nav className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {navItems.filter(item => !examConfig || item.id === examConfig.experiment).map(item => {
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  style={{
+                    display: 'flex', alignContent: 'center', alignItems: 'center', gap: '12px',
+                    width: '100%', textAlign: 'left',
+                    border: 'none',
+                    background: activeTab === item.id ? 'var(--primary)' : 'transparent',
+                    color: activeTab === item.id ? '#fff' : 'var(--text-muted)',
+                    boxShadow: activeTab === item.id ? 'var(--glow-shadow)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
             <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setExamConfig(null);
+                navigate('/');
+              }}
               style={{
-                display: 'flex', alignContent: 'center', alignItems: 'center', gap: '12px',
-                width: '100%', textAlign: 'left',
-                border: 'none',
-                background: activeTab === item.id ? 'var(--primary)' : 'transparent',
-                color: activeTab === item.id ? '#fff' : 'var(--text-muted)',
-                boxShadow: activeTab === item.id ? 'var(--glow-shadow)' : 'none',
+                display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                background: 'transparent', border: 'none', color: 'var(--text-muted)'
               }}
             >
-              {item.icon}
-              {item.label}
+              <LogOut size={20} />
+              <span className="settings-text">Exit Lab</span>
             </button>
-          ))}
-        </nav>
+          </div>
+        </aside>
 
-        <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-          <button
-            onClick={() => setPage('landing')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-              background: 'transparent', border: 'none', color: 'var(--text-muted)'
-            }}
-          >
-            <LogOut size={20} />
-            <span className="settings-text">Exit Lab</span>
-          </button>
-        </div>
-      </aside>
+        {/* Main Content Area */}
+        <main className="main-content">
+          <header style={{
+            padding: '24px 32px', borderBottom: '1px solid var(--border-color)',
+            background: 'var(--glass-bg)', backdropFilter: 'blur(10px)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 500 }}>
+              {navItems.find(n => n.id === activeTab)?.label} Experiment
+            </h2>
 
-      {/* Main Content Area */}
-      <main className="main-content">
-        <header style={{
-          padding: '24px 32px', borderBottom: '1px solid var(--border-color)',
-          background: 'var(--glass-bg)', backdropFilter: 'blur(10px)'
-        }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 500 }}>
-            {navItems.find(n => n.id === activeTab)?.label} Experiment
-          </h2>
-        </header>
+            {examConfig && examConfig.studentName && (
+               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                     <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Name:</span> <span style={{ fontWeight: 600, marginLeft: '6px' }}>{examConfig.studentName}</span>
+                     <span style={{ margin: '0 10px', color: 'var(--border-color)' }}>|</span>
+                     <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ID:</span> <span style={{ fontFamily: 'monospace', marginLeft: '6px' }}>{examConfig.studentId}</span>
+                  </div>
+                  {!examConfig.examComplete && timeLeft !== null && (
+                     <div style={{ 
+                        padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', letterSpacing: '1px',
+                        background: showWarning ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.1)',
+                        color: showWarning ? '#ef4444' : '#3b82f6',
+                        border: `1px solid ${showWarning ? '#ef4444' : '#3b82f6'}`,
+                        animation: showWarning ? 'pulse 2s infinite' : 'none'
+                     }}>
+                        {Math.floor(timeLeft / 60000).toString().padStart(2, '0')}:
+                        {Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0')}
+                     </div>
+                  )}
+                  {examConfig.examComplete && (
+                     <div style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid #10b981' }}>
+                        Exam Finished
+                     </div>
+                  )}
+               </div>
+            )}
+          </header>
 
-        <div className="experiment-area">
-          {activeTab === 'ohm' && <OhmsLaw />}
-          {activeTab === 'wheatstone' && <WheatstoneBridge />}
-          {activeTab === 'hooke' && <HookesLaw />}
-          {activeTab === 'viscosity' && <Viscosity />}
-        </div>
-      </main>
-    </div>
-  );
+          <div className="experiment-area">
+            {activeTab === 'ohm' && <OhmsLaw examConfig={examConfig} onSubmitResult={handleExamSubmit} />}
+            {activeTab === 'wheatstone' && <WheatstoneBridge examConfig={examConfig} onSubmitResult={handleExamSubmit} />}
+            {activeTab === 'hooke' && <HookesLaw examConfig={examConfig} onSubmitResult={handleExamSubmit} />}
+            {activeTab === 'viscosity' && <Viscosity examConfig={examConfig} onSubmitResult={handleExamSubmit} />}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Fallback to landing if path not recognized
+  return <LandingPage />;
 }
 
 export default App;

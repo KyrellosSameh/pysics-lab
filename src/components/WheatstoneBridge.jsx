@@ -3,7 +3,7 @@ import { RefreshCw, Activity, CheckCircle2, XCircle, TriangleRight } from 'lucid
 
 const STANDARD_RESISTORS = [10, 22, 33, 47, 56, 68, 100, 150, 220, 330, 470, 560, 680, 1000];
 
-export default function WheatstoneBridge() {
+export default function WheatstoneBridge({ examConfig, onSubmitResult }) {
     const [knownR, setKnownR] = useState(100);
     const [rx, setRx] = useState(150); // Unknown resistor
     const [jockeyL, setJockeyL] = useState(50); // Position in cm (0 to 100)
@@ -19,8 +19,12 @@ export default function WheatstoneBridge() {
     const [tNoise, setTNoise] = useState(1);
 
     const generateNewRx = useCallback(() => {
-        const randomValue = Math.floor(Math.random() * 90 + 10) * 10; // 100 to 1000 in steps of 10
-        setRx(randomValue);
+        if (examConfig) {
+            setRx(examConfig.parameters.wheatstoneUnknown);
+        } else {
+            const randomValue = Math.floor(Math.random() * 90 + 10) * 10; // 100 to 1000 in steps of 10
+            setRx(randomValue);
+        }
         
         // Reset evaluation
         setStudentAnswer('');
@@ -36,7 +40,13 @@ export default function WheatstoneBridge() {
     // Initialize on mount
     useEffect(() => {
         generateNewRx();
-    }, [generateNewRx]);
+    }, [generateNewRx, examConfig?.code]);
+
+    useEffect(() => {
+        if (examConfig?.examComplete) {
+            setIsEvaluated(true);
+        }
+    }, [examConfig?.examComplete]);
 
     const actualKnownR = knownR * tKnown;
     // For vUpper, Left=V, Right=0. Left is Rx, Right is KnownR.
@@ -74,6 +84,10 @@ export default function WheatstoneBridge() {
 
         setIsCorrect(isAnswerCorrect);
         setIsEvaluated(true);
+        
+        if (examConfig && onSubmitResult) {
+            onSubmitResult(parsedAnswer, rx);
+        }
     };
 
     return (
@@ -197,10 +211,10 @@ export default function WheatstoneBridge() {
                             </div>
                             <div style={{ width: '40px', height: '4px', background: '#94a3b8' }}></div>
                         </div>
-                        <div style={{ fontSize: '2.5rem', fontWeight: 700, color: isEvaluated ? (isCorrect ? '#10b981' : '#ef4444') : '#f59e0b', marginTop: '16px' }}>
-                            {isEvaluated ? `${rx} Ω` : '? Ω'}
+                        <div style={{ fontSize: '2.5rem', fontWeight: 700, color: isEvaluated ? (examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444')) : '#f59e0b', marginTop: '16px' }}>
+                            {isEvaluated ? (examConfig ? '*** Ω' : `${rx} Ω`) : '? Ω'}
                         </div>
-                        {isEvaluated && (
+                        {isEvaluated && !examConfig && (
                             <div style={{ fontSize: '1rem', color: 'var(--text-muted)', marginTop: '8px' }}>
                                 True Value
                             </div>
@@ -235,7 +249,7 @@ export default function WheatstoneBridge() {
                                         fontSize: '1rem',
                                         outline: 'none',
                                         transition: 'all 0.2s',
-                                        borderColor: isEvaluated ? (isCorrect ? '#10b981' : '#ef4444') : 'var(--glass-border)',
+                                        borderColor: isEvaluated ? (examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444')) : 'var(--glass-border)',
                                         opacity: (!isBalanced && !isEvaluated) ? 0.5 : 1
                                     }}
                                 />
@@ -260,22 +274,24 @@ export default function WheatstoneBridge() {
                                     Check
                                 </button>
                             ) : (
-                                <button
-                                    type="button"
-                                    onClick={generateNewRx}
-                                    style={{
-                                        background: 'transparent',
-                                        border: '1px solid var(--primary)',
-                                        color: 'var(--primary)',
-                                        borderRadius: '8px',
-                                        padding: '0 16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}
-                                >
-                                    <RefreshCw size={18} /> Retry
-                                </button>
+                                !examConfig && (
+                                    <button
+                                        type="button"
+                                        onClick={generateNewRx}
+                                        style={{
+                                            background: 'transparent',
+                                            border: '1px solid var(--primary)',
+                                            color: 'var(--primary)',
+                                            borderRadius: '8px',
+                                            padding: '0 16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <RefreshCw size={18} /> Retry
+                                    </button>
+                                )
                             )}
                         </form>
 
@@ -288,15 +304,15 @@ export default function WheatstoneBridge() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
-                                background: isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                border: `1px solid ${isCorrect ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                                background: examConfig ? 'rgba(59, 130, 246, 0.1)' : (isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'),
+                                border: `1px solid ${examConfig ? 'rgba(59, 130, 246, 0.3)' : (isCorrect ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)')}`
                             }}>
-                                {isCorrect ? <CheckCircle2 size={24} color="#10b981" /> : <XCircle size={24} color="#ef4444" />}
+                                {examConfig ? <CheckCircle2 size={24} color="#3b82f6" /> : (isCorrect ? <CheckCircle2 size={24} color="#10b981" /> : <XCircle size={24} color="#ef4444" />)}
                                 <div>
-                                    <div style={{ fontWeight: 600, color: isCorrect ? '#10b981' : '#ef4444' }}>
-                                        {isCorrect ? 'Correct! Excellent job.' : 'Incorrect.'}
+                                    <div style={{ fontWeight: 600, color: examConfig ? '#3b82f6' : (isCorrect ? '#10b981' : '#ef4444') }}>
+                                        {examConfig ? 'شكراً لك، لقت تم تسجيل إجابتك بنجاح' : (isCorrect ? 'Correct! Excellent job.' : 'Incorrect.')}
                                     </div>
-                                    {!isCorrect && (
+                                    {(!examConfig && !isCorrect) && (
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                                             Remember: <strong style={{color: '#fff'}}>R<sub>x</sub> = R × (L / (100 - L))</strong>. Did you use the balance length correctly?
                                         </div>
