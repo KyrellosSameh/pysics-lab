@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, Activity, CheckCircle2, XCircle, TriangleRight } from 'lucide-react';
 
 const STANDARD_RESISTORS = [10, 22, 33, 47, 56, 68, 100, 150, 220, 330, 470, 560, 680, 1000];
@@ -8,6 +8,7 @@ export default function WheatstoneBridge({ examConfig, onSubmitResult }) {
     const [rx, setRx] = useState(150); // Unknown resistor
     const [jockeyL, setJockeyL] = useState(50); // Position in cm (0 to 100)
     const [voltage] = useState(12);
+    const jockeySliderRef = useRef(null);
 
     // Evaluation states
     const [studentAnswer, setStudentAnswer] = useState('');
@@ -47,6 +48,17 @@ export default function WheatstoneBridge({ examConfig, onSubmitResult }) {
             setIsEvaluated(true);
         }
     }, [examConfig?.examComplete]);
+
+    useEffect(() => {
+        const el = jockeySliderRef.current;
+        if (!el) return;
+        const handler = (e) => {
+            e.preventDefault();
+            setJockeyL(v => Math.min(99, Math.max(1, parseFloat((v + (e.deltaY < 0 ? 0.1 : -0.1)).toFixed(1)))));
+        };
+        el.addEventListener('wheel', handler, { passive: false });
+        return () => el.removeEventListener('wheel', handler);
+    }, []);
 
     const actualKnownR = knownR * tKnown;
     // For vUpper, Left=V, Right=0. Left is Rx, Right is KnownR.
@@ -98,9 +110,11 @@ export default function WheatstoneBridge({ examConfig, onSubmitResult }) {
                     <h2 style={{ fontSize: '2rem', marginBottom: '8px', color: 'var(--primary)' }}>Meter Bridge (Wheatstone)</h2>
                     <p style={{ color: 'var(--text-muted)' }}>Balance the bridge by sliding the jockey, then calculate the unknown resistance R<sub>x</sub>.</p>
                 </div>
-                <div style={{ padding: '12px 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 600, fontFamily: 'Outfit' }}>R<sub style={{fontSize: '0.8rem'}}>x</sub> = R × (L / (100 - L))</span>
-                </div>
+                {!examConfig && (
+                    <div style={{ padding: '12px 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 600, fontFamily: 'Outfit' }}>R<sub style={{fontSize: '0.8rem'}}>x</sub> = R × (L / (100 - L))</span>
+                    </div>
+                )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '24px', marginTop: '16px' }}>
@@ -149,6 +163,7 @@ export default function WheatstoneBridge({ examConfig, onSubmitResult }) {
                                 <span>100 cm</span>
                             </div>
                             <input 
+                                ref={jockeySliderRef}
                                 type="range" 
                                 min="1" max="99" step="0.1" 
                                 value={jockeyL} 

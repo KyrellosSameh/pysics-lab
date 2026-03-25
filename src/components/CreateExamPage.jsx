@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { 
   ArrowLeft, FileText, Activity, Atom, Scale, TestTube, 
-  Settings, CheckCircle2, Copy 
+  CheckCircle2, Copy 
 } from 'lucide-react';
+// استدعاء ملف الاتصال بقاعدة البيانات
+import { supabase } from '../supabaseClient';
 
-function CreateExamPage({ onBack }) {
+function CreateExamPage({ instructorId, onBack }) {
   const [experiment, setExperiment] = useState('ohm');
   
   // Specific inputs
@@ -18,34 +20,45 @@ function CreateExamPage({ onBack }) {
   const [generatedCode, setGeneratedCode] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const handleGenerate = (e) => {
+  // تعديل الدالة لتصبح Async للتعامل مع قاعدة البيانات
+  const handleGenerate = async (e) => {
     e.preventDefault();
     setLoading(true);
     setGeneratedCode('');
     
-    // Simulate generation delay
-    setTimeout(() => {
-      setLoading(false);
-      // Generate a random 6-digit numeric code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedCode(code);
-      
-      // Save the exam configuration to localStorage
-      const examConfig = {
-        experiment,
-        parameters: {
-          ohmResistance,
-          wheatstoneUnknown,
-          hookeSpringConstant,
-          viscosityLiquid,
-          viscosityBalls
-        },
-        code
+    // إنشاء كود عشوائي من 6 أرقام
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    try {
+      // إرسال البيانات إلى جدول exams في Supabase
+      const examParameters = {
+        ohmResistance,
+        wheatstoneUnknown,
+        hookeSpringConstant,
+        viscosityLiquid,
+        viscosityBalls
       };
+      const { error } = await supabase
+        .from('exams')
+        .insert([
+          { session_code: code, experiment_name: experiment, parameters: examParameters, used: false, instructor_id: instructorId }
+        ]);
+
+      if (error) {
+        throw error;
+      }
+
+      // إذا نجح الإرسال لقاعدة البيانات، نظهر الكود للمدرس
+      setGeneratedCode(code);
+      console.log('Exam saved to Supabase with code:', code);
       
-      localStorage.setItem(`physics_exam_${code}`, JSON.stringify(examConfig));
-      console.log('Exam Configuration Saved:', examConfig);
-    }, 800);
+    } catch (error) {
+      console.error('Error saving exam to Supabase:', error.message);
+      alert('حدث خطأ أثناء حفظ الاختبار في قاعدة البيانات. تأكد من اتصالك بالإنترنت.');
+    } finally {
+      // إيقاف علامة التحميل في كل الأحوال (نجاح أو فشل)
+      setLoading(false);
+    }
   };
 
   const handleCopy = () => {

@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react';
 import { LogOut, PlusCircle, Users, Activity, GraduationCap, ClipboardList, TrendingUp } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
-function InstructorDashboard({ onBack, onCreateExam, onViewResults, username }) {
+function InstructorDashboard({ instructorId, onBack, onCreateExam, onViewResults, username }) {
   const [stats, setStats] = useState({ totalExams: 0, totalStudents: 0 });
 
   useEffect(() => {
-    // Generate some fake stats based on physics_results if exists
-    const results = JSON.parse(localStorage.getItem('physics_results') || '[]');
-    setStats({
-      totalExams: new Set(results.map(r => r.examCode)).size || 0,
-      totalStudents: results.length || 0
-    });
+    const fetchStats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('results')
+          .select('exam_code, student_id')
+          .eq('instructor_id', instructorId);
+
+        if (!error && data) {
+          setStats({
+            totalExams: new Set(data.map(r => r.exam_code)).size || 0,
+            totalStudents: data.length || 0
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching stats:', err);
+      }
+    };
+    fetchStats();
   }, []);
 
   const handleLogout = () => {
-    window.location.hash = ''; // Clear hash
     onBack();
   };
 

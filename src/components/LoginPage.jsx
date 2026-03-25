@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, GraduationCap, Eye, EyeOff, LogIn, Lock, User } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 function LoginPage({ onBack, onLogin }) {
   const [username, setUsername] = useState('');
@@ -8,19 +9,36 @@ function LoginPage({ onBack, onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!username.trim() || !password.trim()) {
-      setError('Please fill in all fields.');
+      setError('يرجى ملء جميع الحقول.');
       return;
     }
     setLoading(true);
-    // Simulate auth – replace with real logic
-    setTimeout(() => {
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('instructors')
+        .select('*')
+        .eq('username', username.trim())
+        .eq('password', password.trim())
+        .single();
+
+      if (fetchError || !data) {
+        setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
+        setLoading(false);
+        return;
+      }
+
+      if (onLogin) onLogin({ username: data.username, id: data.id });
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('حدث خطأ أثناء تسجيل الدخول. تأكد من اتصالك بالإنترنت.');
+    } finally {
       setLoading(false);
-      if (onLogin) onLogin({ username });
-    }, 1200);
+    }
   };
 
   return (

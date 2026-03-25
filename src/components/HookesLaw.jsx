@@ -151,9 +151,11 @@ export default function HookesLaw({ examConfig, onSubmitResult }) {
                     <h2 style={{ fontSize: '2rem', marginBottom: '8px', color: 'var(--primary)' }}>Hooke's Law</h2>
                     <p style={{ color: 'var(--text-muted)' }}>Investigate the elasticity and calculate the unknown spring constant.</p>
                 </div>
-                <div style={{ padding: '12px 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 600, fontFamily: 'Outfit' }}>k = F / x</span>
-                </div>
+                {!examConfig && (
+                    <div style={{ padding: '12px 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 600, fontFamily: 'Outfit' }}>k = F / x</span>
+                    </div>
+                )}
             </div>
 
             <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(450px, 2fr) minmax(320px, 1fr)', gap: '32px', marginTop: '16px' }}>

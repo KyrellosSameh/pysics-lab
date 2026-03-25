@@ -1,27 +1,92 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Save, CheckCircle2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
-function StudentResultsPage({ onBack }) {
+function StudentResultsPage({ instructorId, onBack }) {
   const [results, setResults] = useState([]);
   const [savedMessage, setSavedMessage] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const data = localStorage.getItem('physics_results');
-    if (data) {
-      setResults(JSON.parse(data));
-    }
+    const fetchResults = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('results')
+          .select('*')
+          .eq('instructor_id', instructorId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          setResults(data);
+        }
+      } catch (err) {
+        console.error('Error fetching results:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchResults();
   }, []);
 
   const handleGradeChange = (index, value) => {
     const newResults = [...results];
-    newResults[index].instructorGrade = value;
+    newResults[index].instructor_grade = value;
     setResults(newResults);
   };
 
-  const saveGrades = () => {
-    localStorage.setItem('physics_results', JSON.stringify(results));
-    setSavedMessage(true);
-    setTimeout(() => setSavedMessage(false), 3000);
+  const saveGrades = async () => {
+    try {
+      // Update each result's grade in Supabase
+      for (const result of results) {
+        await supabase
+          .from('results')
+          .update({ instructor_grade: result.instructor_grade || '' })
+          .eq('id', result.id);
+      }
+      setSavedMessage(true);
+      setTimeout(() => setSavedMessage(false), 3000);
+    } catch (err) {
+      console.error('Error saving grades:', err);
+      alert('حدث خطأ أثناء حفظ التقييمات.');
+    }
+  };
+
+  const renderResultData = (dataStr, unit, isStudent) => {
+    if (!dataStr) return '';
+    if (dataStr === '--') return <span style={{ color: '#ef4444' }}>--</span>;
+    try {
+      const obj = JSON.parse(dataStr);
+      if (obj && obj.table) {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '180px' }}>
+            <span style={{ fontWeight: 'bold', color: isStudent ? '#10b981' : 'var(--text-muted)' }}>Avg: {obj.avg} {unit}</span>
+            <table style={{ fontSize: '0.75rem', width: '100%', borderCollapse: 'collapse', background: 'rgba(0,0,0,0.2)', color: 'var(--text-main)', textAlign: 'center' }}>
+              <tbody>
+                <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                  <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>B</th>
+                  <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>D</th>
+                  <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>t</th>
+                  <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>v</th>
+                  <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>η</th>
+                </tr>
+                {obj.table.map((row, i) => (
+                  <tr key={i}>
+                    <td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px', color: 'var(--primary)' }}>{row.id}</td>
+                    <td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>{row.d}</td>
+                    <td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>{row.t}</td>
+                    <td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>{row.v}</td>
+                    <td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '4px' }}>{row.eta}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+    } catch {
+      // fallback to plain string
+    }
+    return <span style={{ fontWeight: 600, color: isStudent ? (dataStr === '--' ? '#ef4444' : '#10b981') : 'var(--text-muted)' }}>{dataStr} {unit}</span>;
   };
 
   return (
@@ -71,7 +136,11 @@ function StudentResultsPage({ onBack }) {
             <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>سجل اختبارات العملي</h3>
           </div>
 
-          {results.length === 0 ? (
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              جاري تحميل النتائج...
+            </div>
+          ) : results.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
               لا توجد أية نتائج للطلاب بعد.
             </div>
@@ -90,26 +159,26 @@ function StudentResultsPage({ onBack }) {
               </thead>
               <tbody>
                 {results.map((req, index) => (
-                  <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
+                  <tr key={req.id || index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
                     <td style={{ padding: '16px', color: 'var(--primary)' }}>{req.experiment}</td>
-                    <td style={{ padding: '16px' }}>{req.studentName}</td>
-                    <td style={{ padding: '16px', fontFamily: 'monospace', color: '#a78bfa' }}>{req.studentId}</td>
+                    <td style={{ padding: '16px' }}>{req.student_name}</td>
+                    <td style={{ padding: '16px', fontFamily: 'monospace', color: '#a78bfa' }}>{req.student_id}</td>
                     <td style={{ padding: '16px' }}>
                       <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '0.85rem' }}>
-                        {req.examCode}
+                        {req.exam_code}
                       </span>
                     </td>
-                    <td style={{ padding: '16px', fontWeight: 600, color: req.studentResult === '--' ? '#ef4444' : '#10b981' }}>
-                      {req.studentResult} {req.studentResult !== '--' ? req.unit : ''}
+                    <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                      {renderResultData(req.student_result, req.student_result !== '--' ? req.unit : '', true)}
                     </td>
-                    <td style={{ padding: '16px', color: 'var(--text-muted)' }}>
-                      {req.actualResult} {req.unit}
+                    <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                      {renderResultData(req.actual_result, req.unit, false)}
                     </td>
                     <td style={{ padding: '16px' }}>
                       <input 
                         type="text" 
                         placeholder="0/10"
-                        value={req.instructorGrade || ''}
+                        value={req.instructor_grade || ''}
                         onChange={(e) => handleGradeChange(index, e.target.value)}
                         style={{
                           width: '80px', padding: '8px', background: 'rgba(0,0,0,0.3)', 

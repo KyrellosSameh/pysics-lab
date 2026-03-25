@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Zap, Activity, Battery, TriangleRight, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 
 // Standard E12 series resistor values suitable for lab experiments (Ohms)
@@ -7,6 +7,7 @@ const STANDARD_RESISTORS = [10, 22, 33, 47, 56, 68, 100, 150, 220, 330, 470, 560
 export default function OhmsLaw({ examConfig, onSubmitResult }) {
     const [voltage, setVoltage] = useState(12); // Volts
     const [resistance, setResistance] = useState(100); // True Resistance in Ohms
+    const voltageSliderRef = useRef(null);
     
     // Evaluation states
     const [studentAnswer, setStudentAnswer] = useState('');
@@ -46,6 +47,17 @@ export default function OhmsLaw({ examConfig, onSubmitResult }) {
             setIsEvaluated(true);
         }
     }, [examConfig?.examComplete]);
+
+    useEffect(() => {
+        const el = voltageSliderRef.current;
+        if (!el) return;
+        const handler = (e) => {
+            e.preventDefault();
+            setVoltage(v => Math.min(24, Math.max(0, v + (e.deltaY < 0 ? 0.5 : -0.5))));
+        };
+        el.addEventListener('wheel', handler, { passive: false });
+        return () => el.removeEventListener('wheel', handler);
+    }, []);
 
     const theoreticalCurrent = voltage / resistance;
 
@@ -92,9 +104,11 @@ export default function OhmsLaw({ examConfig, onSubmitResult }) {
                     <h2 style={{ fontSize: '2rem', marginBottom: '8px', color: 'var(--primary)' }}>Ohm's Law Simulator</h2>
                     <p style={{ color: 'var(--text-muted)' }}>Calculate the value of the unknown resistor using Voltmeter and Ammeter readings.</p>
                 </div>
-                <div style={{ padding: '12px 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 600, fontFamily: 'Outfit' }}>R = V / I</span>
-                </div>
+                {!examConfig && (
+                    <div style={{ padding: '12px 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 600, fontFamily: 'Outfit' }}>R = V / I</span>
+                    </div>
+                )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '24px', marginTop: '16px' }}>
@@ -121,6 +135,7 @@ export default function OhmsLaw({ examConfig, onSubmitResult }) {
                                 <span>{voltage} V</span>
                             </div>
                             <input
+                                ref={voltageSliderRef}
                                 type="range"
                                 min="0" max="24" step="0.5"
                                 value={voltage}

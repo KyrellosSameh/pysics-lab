@@ -80,6 +80,7 @@ export default function Viscosity({ examConfig, onSubmitResult }) {
 
     // Manual Micrometer State
     const [micrometerGap, setMicrometerGap] = useState(25.00); 
+    const micrometerSliderRef = useRef(null);
 
     const [simState, setSimState] = useState('idle'); 
     const [dropPosition, setDropPosition] = useState(0); 
@@ -152,6 +153,21 @@ export default function Viscosity({ examConfig, onSubmitResult }) {
         setMicrometerGap(val);
     };
 
+    useEffect(() => {
+        const el = micrometerSliderRef.current;
+        if (!el) return;
+        const handler = (e) => {
+            e.preventDefault();
+            setMicrometerGap(prev => {
+                const newVal = parseFloat((prev + (e.deltaY < 0 ? 0.01 : -0.01)).toFixed(2));
+                const clamped = Math.min(25, Math.max(0, newVal));
+                return clamped < activeBall.dTrue ? activeBall.dTrue : clamped;
+            });
+        };
+        el.addEventListener('wheel', handler, { passive: false });
+        return () => el.removeEventListener('wheel', handler);
+    }, [activeBall.dTrue]);
+
     const handleInputChange = (id, field, value) => {
         setBalls(prev => prev.map(b => b.id === id ? { ...b, [field]: value } : b));
     };
@@ -213,7 +229,37 @@ export default function Viscosity({ examConfig, onSubmitResult }) {
         }
         
         if (examConfig && onSubmitResult) {
-            onSubmitResult(avgInputNum, avgExpected);
+            const studentTable = newBalls.map(b => ({
+                id: b.id,
+                d: b.inputD || '-',
+                t: b.tMeasured ? b.tMeasured.toFixed(2) : '-',
+                v: b.inputV || '-',
+                eta: b.inputEta || '-'
+            }));
+            
+            const actualTable = newBalls.map(b => {
+                const expectedV = b.tMeasured ? (distanceMeters / b.tMeasured).toFixed(3) : '-';
+                const expectedEta = b.tMeasured ? ((2 * Math.pow(((b.dTrue)/2)/1000, 2) * g * (ballDensity - fluidProps.density)) / (9 * expectedV)).toFixed(3) : '-';
+                return {
+                    id: b.id,
+                    d: b.dTrue,
+                    t: b.tMeasured ? b.tMeasured.toFixed(2) : '-',
+                    v: expectedV,
+                    eta: expectedEta
+                };
+            });
+            
+            const studentOutput = JSON.stringify({
+                avg: isNaN(avgInputNum) ? '-' : avgInputNum,
+                table: studentTable
+            });
+
+            const actualOutput = JSON.stringify({
+                avg: fluidProps.viscosity,
+                table: actualTable
+            });
+            
+            onSubmitResult(studentOutput, actualOutput);
         }
     };
 
@@ -324,6 +370,7 @@ export default function Viscosity({ examConfig, onSubmitResult }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '0.9rem', color: '#f59e0b', fontWeight: 'bold' }}>Close Jaws</span>
                     <input 
+                        ref={micrometerSliderRef}
                         type="range" 
                         min="0" max="25" step="0.01" 
                         value={micrometerGap} 
@@ -567,10 +614,12 @@ export default function Viscosity({ examConfig, onSubmitResult }) {
                     </button>
                 </div>
 
-                <div style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                    <p><strong>Hint:</strong> Use the formula η = [ 2 * (ρ<sub>s</sub> - ρ<sub>f</sub>) * g * r² ] / (9 * v)</p>
-                    <p>Remember that radius (r) is half the diameter, and must be in meters for the calculation! Also distance between marks is {distanceMeters}m for velocity.</p>
-                </div>
+                {!examConfig && (
+                    <div style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                        <p><strong>Hint:</strong> Use the formula η = [ 2 * (ρ<sub>s</sub> - ρ<sub>f</sub>) * g * r² ] / (9 * v)</p>
+                        <p>Remember that radius (r) is half the diameter, and must be in meters for the calculation! Also distance between marks is {distanceMeters}m for velocity.</p>
+                    </div>
+                )}
             </div>
 
         </div>

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { ArrowLeft, BookOpen, Hash, ArrowRight } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 const CODE_LENGTH = 6;
 
@@ -12,6 +13,9 @@ function SessionCodePage({ onBack, onJoin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const inputsRef = useRef([]);
+
+  // Store the exam data fetched from Supabase so we can use it in step 2
+  const [examData, setExamData] = useState(null);
 
   const handleChange = (idx, value) => {
     const digit = value.replace(/\D/g, '').slice(-1);
@@ -39,51 +43,117 @@ function SessionCodePage({ onBack, onJoin }) {
     inputsRef.current[focusIdx]?.focus();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const fullCode = code.join('');
     if (fullCode.length < CODE_LENGTH) {
       setError('Please enter the full 6-digit session code.');
       return;
     }
-    
-    // Validate against localStorage
-    const savedConfigStr = localStorage.getItem(`physics_exam_${fullCode}`);
-    if (!savedConfigStr) {
-      setError('كود الجلسة غير صالح أو غير موجود (Invalid Session Code).');
-      return;
-    }
 
-    const savedConfig = JSON.parse(savedConfigStr);
     setError('');
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      // Query Supabase for the session code
+      const { data, error: fetchError } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('session_code', fullCode)
+        .single();
+
+      if (fetchError || !data) {
+        setError('كود الجلسة غير صالح أو غير موجود (Invalid Session Code).');
+        setLoading(false);
+        return;
+      }
+
+      // Check if the code has already been used
+      if (data.used) {
+        setError('هذا الكود تم استخدامه بالفعل من طالب آخر (Code already used).');
+        setLoading(false);
+        return;
+      }
+
+      // Store the exam data for step 2
+      setExamData(data);
+      setStep('info');
+    } catch (err) {
+      console.error('Error validating code:', err);
+      setError('حدث خطأ أثناء التحقق من الكود. تأكد من اتصالك بالإنترنت.');
+    } finally {
       setLoading(false);
-      setStep('info'); // Move to next step instead of joining immediately
-    }, 1000);
+    }
   };
 
-  const handleInfoSubmit = (e) => {
+  const handleInfoSubmit = async (e) => {
     e.preventDefault();
     if (!studentName.trim() || !studentId.trim()) {
-      setError('يرجى إدخال الاسم والرقم الأكاديمي المكون من أرقام فقط.');
+      setError('يرجى إدخال الاسم والرقم الأكاديمي.');
       return;
     }
-    
-    // Validate ID is somewhat numeric-like if needed, but simple trim check is okay.
-    const fullCode = code.join('');
-    const savedConfig = JSON.parse(localStorage.getItem(`physics_exam_${fullCode}`));
-    
-    // Add student details
-    savedConfig.studentName = studentName.trim();
-    savedConfig.studentId = studentId.trim();
-    savedConfig.startTime = Date.now(); // 30 minutes start now
 
+    setError('');
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      // 1. Verify student is registered
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('student_id')
+        .eq('student_id', studentId.trim());
+
+      if (studentError) throw studentError;
+      
+      if (!studentData || studentData.length === 0) {
+        setError('هذا الرقم الأكاديمي غير مسجل في النظام. المرجو التأكد من الرقم.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Prevent taking the same experiment twice
+      const { data: previousResults, error: resultsError } = await supabase
+        .from('results')
+        .select('id')
+        .eq('student_id', studentId.trim())
+        .eq('experiment', examData.experiment_name);
+
+      if (resultsError) throw resultsError;
+
+      if (previousResults && previousResults.length > 0) {
+        setError('لقد قمت بإجراء هذا الاختبار (التجربة) من قبل ولا يُسمح لك بإعادته.');
+        setLoading(false);
+        return;
+      }
+
+      // Mark the exam as used in Supabase
+      const { error: updateError } = await supabase
+        .from('exams')
+        .update({ used: true })
+        .eq('session_code', examData.session_code);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Build the exam config from Supabase data
+      const examConfig = {
+        experiment: examData.experiment_name,
+        parameters: examData.parameters,
+        code: examData.session_code,
+        studentName: studentName.trim(),
+        studentId: studentId.trim(),
+        instructorId: examData.instructor_id,
+        startTime: Date.now(), // 30 minutes start now
+      };
+
+      if (onJoin) onJoin(examConfig);
+    } catch (err) {
+      console.error('Error joining exam:', err);
+      setError('حدث خطأ أثناء الانضمام للاختبار. حاول مرة أخرى.');
+    } finally {
       setLoading(false);
-      if (onJoin) onJoin(savedConfig);
-    }, 800);
+    }
   };
 
   const isFull = code.every((d) => d !== '');

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import { supabase } from './supabaseClient';
 import OhmsLaw from './components/OhmsLaw';
 import WheatstoneBridge from './components/WheatstoneBridge';
 import HookesLaw from './components/HookesLaw';
@@ -17,6 +18,7 @@ function App() {
   
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('app_activeTab') || 'ohm');
   const [instructorName, setInstructorName] = useState(() => localStorage.getItem('app_instructorName') || '');
+  const [instructorId, setInstructorId] = useState(() => localStorage.getItem('app_instructorId') || '');
   const [examConfig, setExamConfig] = useState(() => {
     const saved = localStorage.getItem('app_examConfig');
     return saved ? JSON.parse(saved) : null;
@@ -24,6 +26,7 @@ function App() {
 
   const [timeLeft, setTimeLeft] = useState(null);
   const [showWarning, setShowWarning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Hash Routing Listener
   useEffect(() => {
@@ -44,16 +47,45 @@ function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem('app_instructorName', instructorName);
+    if (instructorName) {
+      localStorage.setItem('app_instructorName', instructorName);
+    } else {
+      localStorage.removeItem('app_instructorName');
+    }
   }, [instructorName]);
 
   useEffect(() => {
-    if (examConfig) {
+    if (instructorId) {
+      localStorage.setItem('app_instructorId', instructorId);
+    } else {
+      localStorage.removeItem('app_instructorId');
+    }
+  }, [instructorId]);
+
+  useEffect(() => {
+    if (examConfig && !examConfig.examComplete) {
       localStorage.setItem('app_examConfig', JSON.stringify(examConfig));
     } else {
       localStorage.removeItem('app_examConfig');
     }
   }, [examConfig]);
+
+  useEffect(() => {
+    const verifyNotSubmitted = async () => {
+      if (examConfig && !examConfig.examComplete && examConfig.code) {
+        const { data } = await supabase.from('results').select('id')
+          .eq('student_id', examConfig.studentId)
+          .eq('exam_code', examConfig.code);
+        
+        if (data && data.length > 0) {
+          alert('لقد قمت بإجراء هذا الاختبار مسبقاً.');
+          setExamConfig(null);
+          navigate('/');
+        }
+      }
+    };
+    verifyNotSubmitted();
+  }, [examConfig?.code, examConfig?.studentId]);
 
   useEffect(() => {
     localStorage.setItem('app_activeTab', activeTab);
@@ -85,34 +117,62 @@ function App() {
     return () => clearInterval(timer);
   }, [examConfig]);
 
-  const handleExamSubmit = (studentValue, actualValue) => {
-    if (!examConfig || examConfig.examComplete) return;
+  const handleExamSubmit = async (studentValue, actualValue) => {
+    if (!examConfig || examConfig.examComplete || isSubmitting) return;
+    setIsSubmitting(true);
     
-    // Save to global results
-    const newResults = JSON.parse(localStorage.getItem('physics_results') || '[]');
-    newResults.push({
-      studentName: examConfig.studentName,
-      studentId: examConfig.studentId,
-      examCode: examConfig.code || 'N/A',
-      experiment: examConfig.experiment,
-      studentResult: studentValue,
-      actualResult: actualValue,
-      unit: examConfig.experiment === 'ohm' ? 'Ω' :
-            examConfig.experiment === 'wheatstone' ? 'Ω' :
-            examConfig.experiment === 'hooke' ? 'N/m' : 'Pa·s',
-      instructorGrade: ''
-    });
-    localStorage.setItem('physics_results', JSON.stringify(newResults));
+    // Save result to Supabase
+    const unit = examConfig.experiment === 'ohm' ? 'Ω' :
+          examConfig.experiment === 'wheatstone' ? 'Ω' :
+          examConfig.experiment === 'hooke' ? 'N/m' : 'Pa·s';
+    
+    try {
+      const { data: existing } = await supabase.from('results').select('id')
+        .eq('student_id', examConfig.studentId)
+        .eq('exam_code', examConfig.code || 'N/A');
+        
+      if (existing && existing.length > 0) {
+         alert("خطأ: لقد تم إرسال نتيجتك بالفعل مسبقاً.");
+         setExamConfig(null);
+         navigate('/');
+         setIsSubmitting(false);
+         return;
+      }
+
+      const { error: insertError } = await supabase.from('results').insert([{
+        student_name: examConfig.studentName,
+        student_id: examConfig.studentId,
+        exam_code: examConfig.code || 'N/A',
+        experiment: examConfig.experiment,
+        student_result: String(studentValue),
+        actual_result: String(actualValue),
+        unit,
+        instructor_grade: '',
+        instructor_id: examConfig.instructorId || null
+      }]);
+      if (insertError) {
+        console.error('Supabase insert error:', insertError.message);
+        alert('خطأ في حفظ النتيجة: ' + insertError.message);
+      }
+    } catch (err) {
+      console.error('Error saving result to Supabase:', err);
+    }
     
     // Lock exam
     const updatedConfig = { ...examConfig, examComplete: true };
     setExamConfig(updatedConfig);
+    setIsSubmitting(false);
     
     if (studentValue === '--') {
          alert("انتهى وقت الاختبار. تم إرسال إجابتك تلقائياً.");
     } else {
          alert("تم إرسال إجابتك وإنهاء الاختبار بنجاح.");
     }
+
+    setTimeout(() => {
+      setExamConfig(null);
+      navigate('/');
+    }, 3000);
   };
 
   const navItems = [
@@ -127,51 +187,52 @@ function App() {
     return <LandingPage />;
   }
 
-  // Unified Instructor Entry Route
-  if (currentPath === '/lab/instructor') {
-    // If not logged in, show login page
-    if (!instructorName) {
+  // Unified Instructor Entry Route and Protected Views
+  if (currentPath.startsWith('/lab/instructor')) {
+    // Show login page if unauthenticated
+    if (!instructorName || !instructorId) {
       return (
         <LoginPage
           onBack={() => navigate('/')}
           onLogin={(data) => {
             setInstructorName(data.username);
+            setInstructorId(data.id);
             navigate('/lab/instructor/dashboard');
           }}
         />
       );
-    } else {
-      // If logged in but visited `/lab/instructor`, auto-redirect to dashboard
-      window.location.hash = '/lab/instructor/dashboard';
-      return null;
     }
-  }
 
-  if (currentPath === '/lab/instructor/dashboard') {
-    return (
-      <InstructorDashboard 
-        username={instructorName}
-        onBack={() => { setInstructorName(''); navigate('/'); }}
-        onCreateExam={() => navigate('/lab/instructor/create')}
-        onViewResults={() => navigate('/lab/instructor/results')}
-      />
-    );
-  }
+    // Dashboard View (or trailing /lab/instructor when logged in)
+    if (currentPath === '/lab/instructor' || currentPath === '/lab/instructor/dashboard') {
+      return (
+        <InstructorDashboard 
+          username={instructorName}
+          instructorId={instructorId}
+          onBack={() => { setInstructorName(''); setInstructorId(''); navigate('/'); }}
+          onCreateExam={() => navigate('/lab/instructor/create')}
+          onViewResults={() => navigate('/lab/instructor/results')}
+        />
+      );
+    }
 
-  if (currentPath === '/lab/instructor/create') {
-    return (
-      <CreateExamPage
-        onBack={() => navigate('/lab/instructor/dashboard')}
-      />
-    );
-  }
+    if (currentPath === '/lab/instructor/create') {
+      return (
+        <CreateExamPage
+          instructorId={instructorId}
+          onBack={() => navigate('/lab/instructor/dashboard')}
+        />
+      );
+    }
 
-  if (currentPath === '/lab/instructor/results') {
-    return (
-      <StudentResultsPage 
-        onBack={() => navigate('/lab/instructor/dashboard')}
-      />
-    );
+    if (currentPath === '/lab/instructor/results') {
+      return (
+        <StudentResultsPage 
+          instructorId={instructorId}
+          onBack={() => navigate('/lab/instructor/dashboard')}
+        />
+      );
+    }
   }
 
   if (currentPath === '/lab/student') {
@@ -188,6 +249,11 @@ function App() {
   }
 
   // ── Page: Lab ──────────────────────────────────────────────────
+  if (currentPath === '/lab/exam' && !examConfig) {
+    navigate('/lab/student');
+    return null;
+  }
+
   // Both '/lab/browse' and '/lab/exam' share the same lab UI
   if (currentPath === '/lab/browse' || currentPath === '/lab/exam') {
     return (
