@@ -1,34 +1,45 @@
-import { useState } from 'react';
-import { 
-  ArrowLeft, FileText, Activity, Atom, Scale, TestTube, 
-  CheckCircle2, Copy 
-} from 'lucide-react';
+import { useState } from "react";
+import {
+  ArrowLeft,
+  FileText,
+  Activity,
+  Atom,
+  Scale,
+  TestTube,
+  CheckCircle2,
+  Copy,
+  ShieldCheck,
+  Layers,
+} from "lucide-react";
 // استدعاء ملف الاتصال بقاعدة البيانات
-import { supabase } from '../supabaseClient';
+import { supabase } from "../supabaseClient";
 
 function CreateExamPage({ instructorId, onBack }) {
-  const [experiment, setExperiment] = useState('ohm');
-  
+  const [experiment, setExperiment] = useState("ohm");
+
   // Specific inputs
   const [ohmResistance, setOhmResistance] = useState(50);
   const [wheatstoneUnknown, setWheatstoneUnknown] = useState(45);
   const [hookeSpringConstant, setHookeSpringConstant] = useState(50);
-  const [viscosityLiquid, setViscosityLiquid] = useState('Glycerin');
+  const [viscosityLiquid, setViscosityLiquid] = useState("Glycerin");
   const [viscosityBalls, setViscosityBalls] = useState([2, 3, 4, 5, 6]);
-  
+
+  // Security options
+  const [requiresSeb, setRequiresSeb] = useState(true);
+
   const [loading, setLoading] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState('');
+  const [generatedCode, setGeneratedCode] = useState("");
   const [copied, setCopied] = useState(false);
 
   // تعديل الدالة لتصبح Async للتعامل مع قاعدة البيانات
   const handleGenerate = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setGeneratedCode('');
-    
+    setGeneratedCode("");
+
     // إنشاء كود عشوائي من 6 أرقام
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     try {
       // إرسال البيانات إلى جدول exams في Supabase
       const examParameters = {
@@ -36,12 +47,19 @@ function CreateExamPage({ instructorId, onBack }) {
         wheatstoneUnknown,
         hookeSpringConstant,
         viscosityLiquid,
-        viscosityBalls
+        viscosityBalls,
+        requires_seb: requiresSeb,
       };
       const { error } = await supabase
-        .from('exams')
+        .from("exams")
         .insert([
-          { session_code: code, experiment_name: experiment, parameters: examParameters, used: false, instructor_id: instructorId }
+          {
+            session_code: code,
+            experiment_name: experiment,
+            parameters: examParameters,
+            used: false,
+            instructor_id: instructorId,
+          },
         ]);
 
       if (error) {
@@ -50,13 +68,81 @@ function CreateExamPage({ instructorId, onBack }) {
 
       // إذا نجح الإرسال لقاعدة البيانات، نظهر الكود للمدرس
       setGeneratedCode(code);
-      console.log('Exam saved to Supabase with code:', code);
-      
+      console.log("Exam saved to Supabase with code:", code);
     } catch (error) {
-      console.error('Error saving exam to Supabase:', error.message);
-      alert('حدث خطأ أثناء حفظ الاختبار في قاعدة البيانات. تأكد من اتصالك بالإنترنت.');
+      console.error("Error saving exam to Supabase:", error.message);
+      alert(
+        "حدث خطأ أثناء حفظ الاختبار في قاعدة البيانات. تأكد من اتصالك بالإنترنت.",
+      );
     } finally {
       // إيقاف علامة التحميل في كل الأحوال (نجاح أو فشل)
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateBulk = async () => {
+    if (
+      !window.confirm(
+        "هل أنت متأكد من رغبتك في توليد 50 كود اختبار عشوائي لتغذية بنك الامتحانات؟ (التجارب والقيم ستكون عشوائية تماماً)",
+      )
+    )
+      return;
+    setLoading(true);
+    setGeneratedCode("");
+
+    const experimentsList = ["ohm", "wheatstone", "hooke", "viscosity"];
+    const liquids = ["Glycerin", "Castor Oil", "Motor Oil"];
+    const newExams = [];
+
+    // التوليد العشوائي المتعدد
+    for (let i = 0; i < 50; i++) {
+      const randExp =
+        experimentsList[Math.floor(Math.random() * experimentsList.length)];
+      // Ensure a slightly more unique random string or use timestamp + random, but standard math random is fine for this demo limit
+      // Since we may generate 50 rapidly, let's make sure codes are unique in the local batch
+      let code = "";
+      do {
+        code = Math.floor(100000 + Math.random() * 900000).toString();
+      } while (newExams.find((ex) => ex.session_code === code));
+
+      const params = { requires_seb: requiresSeb };
+      if (randExp === "ohm") {
+        params.ohmResistance = Math.floor(Math.random() * (500 - 10 + 1)) + 10;
+      } else if (randExp === "wheatstone") {
+        params.wheatstoneUnknown =
+          Math.floor(Math.random() * (500 - 10 + 1)) + 10;
+      } else if (randExp === "hooke") {
+        params.hookeSpringConstant =
+          Math.floor(Math.random() * (200 - 10 + 1)) + 10;
+      } else if (randExp === "viscosity") {
+        params.viscosityLiquid =
+          liquids[Math.floor(Math.random() * liquids.length)];
+        const ballsArray = [];
+        for (let b = 0; b < 5; b++) {
+          ballsArray.push(Math.floor(Math.random() * (8 - 1 + 1)) + 1);
+        }
+        params.viscosityBalls = ballsArray.sort((a, b) => a - b);
+      }
+
+      newExams.push({
+        session_code: code,
+        experiment_name: randExp,
+        parameters: params,
+        used: false,
+        instructor_id: instructorId,
+      });
+    }
+
+    try {
+      const { error } = await supabase.from("exams").insert(newExams);
+      if (error) throw error;
+      alert(
+        "تم بنجاح توليد ورفع 50 اختبار عشوائي ومختلف لـ بنك الامتحانات بشكل مباشر!",
+      );
+    } catch (err) {
+      console.error("Error in bulk generation:", err);
+      alert("حدث خطأ أثناء رفع الاختبارات المتعددة.");
+    } finally {
       setLoading(false);
     }
   };
@@ -71,9 +157,9 @@ function CreateExamPage({ instructorId, onBack }) {
 
   const renderExperimentInputs = () => {
     switch (experiment) {
-      case 'ohm':
+      case "ohm":
         return (
-          <div className="auth-field" style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="auth-field" style={{ animation: "fadeIn 0.3s ease" }}>
             <label htmlFor="ohmRes">قيمة المقاومة المجهولة (أوم)</label>
             <div className="auth-input-wrapper">
               <Activity size={18} className="auth-input-icon" />
@@ -86,14 +172,20 @@ function CreateExamPage({ instructorId, onBack }) {
                 onChange={(e) => setOhmResistance(Number(e.target.value))}
               />
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-               حدد قيمة المقاومة التي يجب على الطالب حسابها (1 - 500 أوم)
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                marginTop: "4px",
+              }}
+            >
+              حدد قيمة المقاومة التي يجب على الطالب حسابها (1 - 500 أوم)
             </p>
           </div>
         );
-      case 'wheatstone':
+      case "wheatstone":
         return (
-          <div className="auth-field" style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="auth-field" style={{ animation: "fadeIn 0.3s ease" }}>
             <label htmlFor="wheatRes">المقاومة المجهولة Rx (أوم)</label>
             <div className="auth-input-wrapper">
               <Atom size={18} className="auth-input-icon" />
@@ -106,14 +198,20 @@ function CreateExamPage({ instructorId, onBack }) {
                 onChange={(e) => setWheatstoneUnknown(Number(e.target.value))}
               />
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                marginTop: "4px",
+              }}
+            >
               حدد قيمة المقاومة المجهولة لتجربة قنطرة ويتستون
             </p>
           </div>
         );
-      case 'hooke':
+      case "hooke":
         return (
-          <div className="auth-field" style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div className="auth-field" style={{ animation: "fadeIn 0.3s ease" }}>
             <label htmlFor="springConst">ثابت الزنبرك k (نيوتن/متر)</label>
             <div className="auth-input-wrapper">
               <Scale size={18} className="auth-input-icon" />
@@ -126,14 +224,27 @@ function CreateExamPage({ instructorId, onBack }) {
                 onChange={(e) => setHookeSpringConstant(Number(e.target.value))}
               />
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                marginTop: "4px",
+              }}
+            >
               حدد قيمة ثابت الزنبرك للتجربة (10 - 200 N/m)
             </p>
           </div>
         );
-      case 'viscosity':
+      case "viscosity":
         return (
-          <div style={{ animation: 'fadeIn 0.3s ease', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div
+            style={{
+              animation: "fadeIn 0.3s ease",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
             <div className="auth-field">
               <label htmlFor="liquidType">نوع السائل</label>
               <div className="auth-input-wrapper">
@@ -149,11 +260,29 @@ function CreateExamPage({ instructorId, onBack }) {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "8px",
+              }}
+            >
               {[0, 1, 2, 3, 4].map((index) => (
-                <div className="auth-field" key={`ball-${index}`} style={{ margin: 0 }}>
-                  <label htmlFor={`ball${index}`} style={{ fontSize: '0.75rem' }}>كرة {index + 1} (ملم)</label>
-                  <div className="auth-input-wrapper" style={{ padding: '8px' }}>
+                <div
+                  className="auth-field"
+                  key={`ball-${index}`}
+                  style={{ margin: 0 }}
+                >
+                  <label
+                    htmlFor={`ball${index}`}
+                    style={{ fontSize: "0.75rem" }}
+                  >
+                    كرة {index + 1} (ملم)
+                  </label>
+                  <div
+                    className="auth-input-wrapper"
+                    style={{ padding: "8px" }}
+                  >
                     <input
                       id={`ball${index}`}
                       type="number"
@@ -166,13 +295,19 @@ function CreateExamPage({ instructorId, onBack }) {
                         newBalls[index] = Number(e.target.value);
                         setViscosityBalls(newBalls);
                       }}
-                      style={{ paddingLeft: '4px', textAlign: 'center' }}
+                      style={{ paddingLeft: "4px", textAlign: "center" }}
                     />
                   </div>
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-4px' }}>
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                marginTop: "-4px",
+              }}
+            >
               حدد السائل المستخدم والأقطار المتاحة للكرات المعدنية الخمسة
             </p>
           </div>
@@ -187,7 +322,7 @@ function CreateExamPage({ instructorId, onBack }) {
       <div className="blob blob-1" />
       <div className="blob blob-2" />
 
-      <div className="auth-card glass-panel" style={{ maxWidth: '480px' }}>
+      <div className="auth-card glass-panel" style={{ maxWidth: "480px" }}>
         {/* Back Button */}
         <button className="auth-back-btn" onClick={onBack}>
           <ArrowLeft size={18} />
@@ -196,36 +331,50 @@ function CreateExamPage({ instructorId, onBack }) {
 
         {/* Header */}
         <div className="auth-header">
-          <div className="auth-icon-wrapper auth-icon--instructor" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+          <div
+            className="auth-icon-wrapper auth-icon--instructor"
+            style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981" }}
+          >
             <FileText size={32} strokeWidth={1.5} />
           </div>
           <h2 className="auth-title">إنشاء اختبار جديد</h2>
-          <p className="auth-subtitle">قم بتحديد التجربة والمتغيرات الخاصة بها لتوليد كود الاختبار</p>
+          <p className="auth-subtitle">
+            قم بتحديد التجربة والمتغيرات الخاصة بها لتوليد كود الاختبار
+          </p>
         </div>
 
         {/* Form */}
         <form className="auth-form" onSubmit={handleGenerate}>
-          
           {/* Experiment Selection */}
           <div className="auth-field">
             <label htmlFor="experiment">اختر التجربة</label>
             <div className="auth-input-wrapper" style={{ padding: 0 }}>
-              <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
-                {experiment === 'ohm' && <Activity size={18} />}
-                {experiment === 'wheatstone' && <Atom size={18} />}
-                {experiment === 'hooke' && <Scale size={18} />}
-                {experiment === 'viscosity' && <TestTube size={18} />}
+              <div
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {experiment === "ohm" && <Activity size={18} />}
+                {experiment === "wheatstone" && <Atom size={18} />}
+                {experiment === "hooke" && <Scale size={18} />}
+                {experiment === "viscosity" && <TestTube size={18} />}
               </div>
               <select
                 id="experiment"
                 value={experiment}
                 onChange={(e) => {
                   setExperiment(e.target.value);
-                  setGeneratedCode(''); // reset code on change
+                  setGeneratedCode(""); // reset code on change
                 }}
               >
                 <option value="ohm">قانون أوم (Ohm's Law)</option>
-                <option value="wheatstone">قنطرة ويتستون (Wheatstone Bridge)</option>
+                <option value="wheatstone">
+                  قنطرة ويتستون (Wheatstone Bridge)
+                </option>
                 <option value="hooke">قانون هوك (Hooke's Law)</option>
                 <option value="viscosity">تجربة اللزوجة (Viscosity)</option>
               </select>
@@ -233,82 +382,201 @@ function CreateExamPage({ instructorId, onBack }) {
           </div>
 
           {/* Dynamic Inputs Based on Experiment */}
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
-            padding: '16px', 
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.05)',
-            marginBottom: '20px'
-          }}>
+          <div
+            style={{
+              background: "rgba(255, 255, 255, 0.03)",
+              padding: "16px",
+              borderRadius: "12px",
+              border: "1px solid rgba(255,255,255,0.05)",
+              marginBottom: "20px",
+            }}
+          >
             {renderExperimentInputs()}
           </div>
 
-          <button
-            type="submit"
-            className="auth-submit-btn"
-            disabled={loading}
-            style={{ marginBottom: '16px' }}
+          {/* Security Options */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginBottom: "24px",
+              padding: "12px 16px",
+              background: requiresSeb
+                ? "rgba(16, 185, 129, 0.1)"
+                : "rgba(255,255,255,0.05)",
+              borderRadius: "8px",
+              border: `1px solid ${requiresSeb ? "#10b981" : "rgba(255,255,255,0.1)"}`,
+              cursor: "pointer",
+              transition: "all 0.3s",
+            }}
+            onClick={() => setRequiresSeb(!requiresSeb)}
           >
-            {loading ? (
-              <span className="auth-spinner" />
-            ) : (
-              <>
-                <FileText size={18} />
-                <span>توليد كود الاختبار</span>
-              </>
-            )}
-          </button>
+            <div
+              style={{
+                width: "20px",
+                height: "20px",
+                borderRadius: "4px",
+                border: `2px solid ${requiresSeb ? "#10b981" : "#64748b"}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: requiresSeb ? "#10b981" : "transparent",
+              }}
+            >
+              {requiresSeb && <CheckCircle2 size={14} color="#fff" />}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <ShieldCheck
+                  size={18}
+                  color={requiresSeb ? "#10b981" : "#cbd5e1"}
+                />
+                <strong
+                  style={{
+                    color: requiresSeb ? "#10b981" : "var(--text-main)",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  تفعيل المراقبة والمتصفح الآمن (SEB & Camera)
+                </strong>
+              </div>
+              <p
+                style={{
+                  margin: "4px 0 0 0",
+                  fontSize: "0.8rem",
+                  color: "var(--text-muted)",
+                }}
+              >
+                إلزام الطالب باستخدام Safe Exam Browser وتفعيل التقاط صور
+                المراقبة.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+            <button
+              type="submit"
+              className="auth-submit-btn"
+              disabled={loading}
+              style={{ flex: 1, margin: 0 }}
+            >
+              {loading ? (
+                <span className="auth-spinner" />
+              ) : (
+                <>
+                  <FileText size={18} />
+                  <span>توليد كود واحد</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerateBulk}
+              disabled={loading}
+              className="auth-submit-btn"
+              style={{
+                flex: 1,
+                margin: 0,
+                background: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid #3b82f6",
+                color: "#60a5fa",
+                boxShadow: "none",
+              }}
+            >
+              {loading ? (
+                <span className="auth-spinner" />
+              ) : (
+                <>
+                  <Layers size={18} />
+                  <span>توليد 50 كود (عشوائي)</span>
+                </>
+              )}
+            </button>
+          </div>
 
           {/* Generated Code Display */}
           {generatedCode && (
-            <div style={{ 
-              animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
-              borderRadius: '12px',
-              padding: '20px',
-              textAlign: 'center',
-              marginTop: '10px'
-            }}>
-              <p style={{ color: '#10b981', margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <div
+              style={{
+                animation: "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+                background: "rgba(16, 185, 129, 0.1)",
+                border: "1px solid rgba(16, 185, 129, 0.2)",
+                borderRadius: "12px",
+                padding: "20px",
+                textAlign: "center",
+                marginTop: "10px",
+              }}
+            >
+              <p
+                style={{
+                  color: "#10b981",
+                  margin: "0 0 10px 0",
+                  fontSize: "0.9rem",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
                 <CheckCircle2 size={18} />
                 تم توليد كود الاختبار بنجاح
               </p>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '12px',
-                background: 'rgba(0,0,0,0.2)',
-                padding: '12px 20px',
-                borderRadius: '8px',
-                width: 'fit-content',
-                margin: '0 auto'
-              }}>
-                <span style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '4px', color: '#fff', fontFamily: 'monospace' }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "12px",
+                  background: "rgba(0,0,0,0.2)",
+                  padding: "12px 20px",
+                  borderRadius: "8px",
+                  width: "fit-content",
+                  margin: "0 auto",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "2rem",
+                    fontWeight: 700,
+                    letterSpacing: "4px",
+                    color: "#fff",
+                    fontFamily: "monospace",
+                  }}
+                >
                   {generatedCode}
                 </span>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={handleCopy}
-                  style={{ 
-                    background: 'transparent', 
-                    border: 'none', 
-                    color: copied ? '#10b981' : 'var(--text-muted)', 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s'
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: copied ? "#10b981" : "var(--text-muted)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "8px",
+                    borderRadius: "6px",
+                    transition: "all 0.2s",
                   }}
                   title="نسخ الكود"
                 >
                   {copied ? <CheckCircle2 size={24} /> : <Copy size={24} />}
                 </button>
               </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted)",
+                  marginTop: "12px",
+                  marginBottom: 0,
+                }}
+              >
                 أعط هذا الكود للطلاب للدخول إلى الاختبار الخاص بك
               </p>
             </div>
